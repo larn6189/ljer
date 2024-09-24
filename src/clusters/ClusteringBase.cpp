@@ -27,6 +27,7 @@ namespace clusters {
 
 void ClusteringBase::registerKeywords( Keywords& keys ) {
   matrixtools::MatrixOperationBase::registerKeywords( keys ); keys.use("ARG");
+  keys.add("hidden","MASKED_INPUT_ALLOWED","turns on that you are allowed to use masked inputs ");
   keys.setValueDescription("vector with length that is equal to the number of rows in the input matrix.  Elements of this vector are equal to the cluster that each node is a part of");
 }
 
@@ -41,7 +42,7 @@ ClusteringBase::ClusteringBase(const ActionOptions&ao):
   // Now create a value - this holds the data on which cluster each guy is in
   std::vector<unsigned> shape(1); shape[0]=getPntrToArgument(0)->getShape()[0];
   // Build the store here to make sure that next action has all data
-  addValue( shape ); setNotPeriodic(); getPntrToValue()->buildDataStore();
+  addValue( shape ); setNotPeriodic();
   // Resize local variables
   which_cluster.resize( getPntrToArgument(0)->getShape()[0] ); cluster_sizes.resize( getPntrToArgument(0)->getShape()[0] );
 }

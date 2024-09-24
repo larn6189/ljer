@@ -54,12 +54,6 @@ ActionVolume::ActionVolume(const ActionOptions&ao):
   setNotPeriodic(); getPntrToComponent(0)->setDerivativeIsZeroWhenValueIsZero();
 }
 
-bool ActionVolume::isInSubChain( unsigned& nder ) {
-  nder = 0; getFirstActionInChain()->getNumberOfStreamedDerivatives( nder, getPntrToComponent(0) );
-  nder = nder - getNumberOfDerivatives();
-  return true;
-}
-
 void ActionVolume::requestAtoms( const std::vector<AtomNumber> & a ) {
   std::vector<AtomNumber> all_atoms( getAbsoluteIndexes() );
   for(unsigned i=0; i<a.size(); ++i) all_atoms.push_back( a[i] );
@@ -85,7 +79,6 @@ int ActionVolume::checkTaskStatus( const unsigned& taskno, int& flag ) const {
 }
 
 void ActionVolume::calculate() {
-  if( actionInChain() ) return;
   if( getPntrToComponent(0)->getRank()==0 ) {
     setupRegions(); unsigned nref = getNumberOfAtoms() - 1;
     Vector wdf; Tensor vir; std::vector<Vector> refders( nref );
@@ -116,21 +109,20 @@ void ActionVolume::performTask( const unsigned& curr, MultiValue& outvals ) cons
     weight = 1.0 - weight; wdf *= -1.; vir *=-1;
     for(unsigned i=0; i<refders.size(); ++i) refders[i]*=-1;
   }
-  unsigned ostrn = getConstPntrToComponent(0)->getPositionInStream();
-  outvals.setValue( ostrn, weight );
+  outvals.setValue( 0, weight );
 
   if( doNotCalculateDerivatives() ) return;
 
   // Atom position
-  for(unsigned i=0; i<3; ++i ) { outvals.addDerivative( ostrn, 3*curr+i, wdf[i] ); outvals.updateIndex( ostrn, 3*curr+i ); }
+  for(unsigned i=0; i<3; ++i ) { outvals.addDerivative( 0, 3*curr+i, wdf[i] ); outvals.updateIndex( 0, 3*curr+i ); }
   // Add derivatives with respect to reference positions
   unsigned vbase = 3*(getNumberOfAtoms()-nref);
   for(unsigned i=0; i<refders.size(); ++i) {
-    for(unsigned j=0; j<3; ++j ) { outvals.addDerivative( ostrn, vbase, refders[i][j] ); outvals.updateIndex( ostrn, vbase ); vbase++; }
+    for(unsigned j=0; j<3; ++j ) { outvals.addDerivative( 0, vbase, refders[i][j] ); outvals.updateIndex( 0, vbase ); vbase++; }
   }
   // Add virial
   for(unsigned i=0; i<3; ++i) {
-    for(unsigned j=0; j<3; ++j) { outvals.addDerivative( ostrn, vbase, vir(i,j) ); outvals.updateIndex( ostrn, vbase ); vbase++; }
+    for(unsigned j=0; j<3; ++j) { outvals.addDerivative( 0, vbase, vir(i,j) ); outvals.updateIndex( 0, vbase ); vbase++; }
   }
 }
 

@@ -56,6 +56,7 @@ PLUMED_REGISTER_ACTION(Flatten,"FLATTEN")
 void Flatten::registerKeywords( Keywords& keys ) {
   Action::registerKeywords( keys ); ActionWithValue::registerKeywords( keys );
   ActionWithArguments::registerKeywords( keys ); keys.use("ARG");
+  keys.add("hidden","MASKED_INPUT_ALLOWED","turns on that you are allowed to use masked inputs ");
   keys.setValueDescription("a vector containing all the elements of the input matrix");
 }
 
@@ -66,10 +67,9 @@ Flatten::Flatten(const ActionOptions& ao):
 {
   if( getNumberOfArguments()!=1 ) error("should only be one argument for this action");
   if( getPntrToArgument(0)->getRank()!=2 || getPntrToArgument(0)->hasDerivatives() ) error("input to this action should be a matrix");
-  getPntrToArgument(0)->buildDataStore(true);
   std::vector<unsigned> inshape( getPntrToArgument(0)->getShape() );
   std::vector<unsigned> shape( 1 ); shape[0]=inshape[0]*inshape[1];
-  addValue( shape ); setNotPeriodic(); getPntrToComponent(0)->buildDataStore();
+  addValue( shape ); setNotPeriodic();
 }
 
 void Flatten::calculate() {

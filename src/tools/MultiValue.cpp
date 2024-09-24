@@ -24,53 +24,22 @@
 
 namespace PLMD {
 
-MultiValue::MultiValue( const size_t& nvals, const size_t& nder, const size_t& nmat, const size_t& maxcol, const size_t& nbook ):
-  task_index(0),
-  task2_index(0),
-  values(nvals),
-  nderivatives(nder),
-  derivatives(nvals*nder),
-  hasderiv(nvals*nder,false),
-  tmpval(0),
-  nactive(nvals),
-  active_list(nvals*nder),
-  tmpder(nder),
-  atLeastOneSet(false),
-  vector_call(false),
-  nindices(0),
-  nsplit(0),
-  nmatrix_cols(maxcol),
-  matrix_row_stash(nmat*maxcol,0),
-  matrix_force_stash(nder*nmat),
-  matrix_bookeeping(nbook,0),
-  matrix_row_nderivatives(nmat,0),
-  matrix_row_derivative_indices(nmat)
-{
-  for(unsigned i=0; i<nmat; ++i) matrix_row_derivative_indices[i].resize( nder );
-  // This is crap that will be deleted in future
-  std::vector<unsigned> myind( nder );
-  for(unsigned i=0; i<nder; ++i) myind[i]=i;
-}
-
-void MultiValue::resize( const size_t& nvals, const size_t& nder, const size_t& nmat, const size_t& maxcol, const size_t& nbook ) {
+void MultiValue::resize( const size_t& nvals, const size_t& nder ) {
+  if( values.size()==nvals && nderivatives>nder ) return;
   values.resize(nvals); nderivatives=nder; derivatives.resize( nvals*nder );
   hasderiv.resize(nvals*nder,false); nactive.resize(nvals); active_list.resize(nvals*nder);
-  nmatrix_cols=maxcol; matrix_row_stash.resize(nmat*maxcol,0); matrix_force_stash.resize(nmat*nder,0); matrix_bookeeping.resize(nbook, 0);
-  matrix_row_nderivatives.resize(nmat,0); matrix_row_derivative_indices.resize(nmat); atLeastOneSet=false;
-  for(unsigned i=0; i<nmat; ++i) matrix_row_derivative_indices[i].resize( nder );
-  // All crap from here onwards
-  tmpder.resize( nder ); std::vector<unsigned> myind( nder );
-  for(unsigned i=0; i<nder; ++i) myind[i]=i;
+  matrix_force_stash.resize(nder,0);
+  matrix_row_nderivatives=0; matrix_row_derivative_indices.resize(nder); atLeastOneSet=false;
 }
 
 void MultiValue::clearAll() {
   for(unsigned i=0; i<values.size(); ++i) values[i]=0;
-  // Clear matrix row
-  std::fill( matrix_row_stash.begin(), matrix_row_stash.end(), 0 );
   // Clear matrix derivative indices
-  std::fill( matrix_row_nderivatives.begin(), matrix_row_nderivatives.end(), 0 );
-  // Clear matrix forces
-  std::fill(matrix_force_stash.begin(),matrix_force_stash.end(),0);
+  for(unsigned j=0; j<matrix_row_nderivatives; ++j) matrix_force_stash[matrix_row_derivative_indices[j]] = 0;
+  matrix_row_nderivatives=0;
+#ifndef NDEBUG
+  for(unsigned i=0; i<matrix_force_stash.size(); ++i) plumed_assert( fabs(matrix_force_stash[i])<epsilon );
+#endif
   if( !atLeastOneSet ) return;
   for(unsigned i=0; i<values.size(); ++i) clearDerivatives(i);
   atLeastOneSet=false;

@@ -109,11 +109,7 @@ FindContour::FindContour(const ActionOptions&ao):
   std::vector<std::string> argn( ag->getGridCoordinateNames() );
 
   std::vector<unsigned> shape(1); shape[0]=0;
-  for(unsigned i=0; i<argn.size(); ++i ) {
-    addComponent( argn[i], shape ); componentIsNotPeriodic( argn[i] ); getPntrToComponent(i)->buildDataStore();
-  }
-  // Check for task reduction
-  updateTaskListReductionStatus();
+  for(unsigned i=0; i<argn.size(); ++i ) { addComponent( argn[i], shape ); componentIsNotPeriodic( argn[i] ); }
 }
 
 std::string FindContour::getOutputComponentDescription( const std::string& cname, const Keywords& keys ) const {
@@ -165,9 +161,9 @@ void FindContour::getNumberOfTasks( unsigned& ntasks ) {
   }
 }
 
-int FindContour::checkTaskStatus( const unsigned& taskno, int& flag ) const {
+int FindContour::checkTaskIsActive( const unsigned& taskno ) const {
   if( active_cells[taskno]>0 ) return 1;
-  return 0;
+  return -1;
 }
 
 void FindContour::performTask( const unsigned& current, MultiValue& myvals ) const {
@@ -184,7 +180,7 @@ void FindContour::performTask( const unsigned& current, MultiValue& myvals ) con
   // Now find the contour
   findContour( direction, point );
   // And transfer to the store data vessel
-  for(unsigned i=0; i<getPntrToArgument(0)->getRank(); ++i) myvals.setValue( getConstPntrToComponent(i)->getPositionInStream(), point[i] );
+  for(unsigned i=0; i<getPntrToArgument(0)->getRank(); ++i) myvals.setValue( i, point[i] );
 }
 
 }

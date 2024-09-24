@@ -82,12 +82,13 @@ public:
   void setupOnFirstStep( const bool incalc ) override ;
   void getNumberOfTasks( unsigned& ntasks ) override ;
   void areAllTasksRequired( std::vector<ActionWithVector*>& task_reducing_actions ) override ;
+  int checkTaskIsActive( const unsigned& itask ) const override ;
   int checkTaskStatus( const unsigned& taskno, int& flag ) const override ;
   void performTask( const unsigned& current, MultiValue& myvals ) const override ;
   void gatherStoredValue( const unsigned& valindex, const unsigned& code, const MultiValue& myvals,
                           const unsigned& bufstart, std::vector<double>& buffer ) const override ;
-  void updateForceTasksFromValue( const Value* myval, std::vector<unsigned>& force_tasks ) const override ;
-  void gatherForcesOnStoredValue( const Value* myval, const unsigned& itask, const MultiValue& myvals, std::vector<double>& forces ) const override ;
+  bool checkForTaskForce( const unsigned& itask, const Value* myval ) const override ;
+  void gatherForces( const unsigned& i, const MultiValue& myvals, std::vector<double>& forces ) const override ;
 };
 
 PLUMED_REGISTER_ACTION(KDE,"KDE")
@@ -112,6 +113,7 @@ void KDE::registerKeywords( Keywords& keys ) {
   keys.add("optional","GRID_SPACING","the approximate grid spacing (to be used as an alternative or together with GRID_BIN)");
   // Keywords for spherical KDE
   keys.add("compulsory","CONCENTRATION","the concentration parameter for Von Mises-Fisher distributions (only required for SPHERICAL_KDE)");
+  keys.add("hidden","MASKED_INPUT_ALLOWED","turns on that you are allowed to use masked inputs ");
   keys.setValueDescription("a function on a grid that was obtained by doing a Kernel Density Estimation using the input arguments");
 }
 
@@ -245,10 +247,8 @@ KDE::KDE(const ActionOptions&ao):
   if( ignore_out_of_bounds ) log.printf("  ignoring kernels that are outside of grid \n");
   addValueWithDerivatives( shape ); setNotPeriodic();
   getPntrToComponent(0)->setDerivativeIsZeroWhenValueIsZero();
-  // Make sure we store all the arguments
-  for(unsigned i=0; i<getNumberOfArguments(); ++i) getPntrToArgument(i)->buildDataStore();
   // Check for task reduction
-  updateTaskListReductionStatus(); setupOnFirstStep( false );
+  setupOnFirstStep( false );
 }
 
 void KDE::setupOnFirstStep( const bool incalc ) {
@@ -365,6 +365,18 @@ void KDE::getNumberOfTasks( unsigned& ntasks ) {
   return;
 }
 
+int KDE::checkTaskIsActive( const unsigned& itask ) const {
+  if( numberOfKernels>1 ) {
+    if( hasheight && getPntrToArgument(gridobject.getDimension())->getRank()>0
+        && fabs(getPntrToArgument(gridobject.getDimension())->get(itask))<epsilon ) return -1;
+    return 1;
+  }
+  for(unsigned i=0; i<num_neigh; ++i) {
+    if( itask==neighbors[i] ) return 1;
+  }
+  return -1;
+}
+
 int KDE::checkTaskStatus( const unsigned& taskno, int& flag ) const {
   if( numberOfKernels>1 ) {
     if( hasheight && getPntrToArgument(gridobject.getDimension())->getRank()>0
@@ -380,7 +392,6 @@ int KDE::checkTaskStatus( const unsigned& taskno, int& flag ) const {
 void KDE::performTask( const unsigned& current, MultiValue& myvals ) const {
   if( numberOfKernels==1 ) {
     double newval; std::vector<double> args( gridobject.getDimension() ), der( gridobject.getDimension() );
-    unsigned valout = getConstPntrToComponent(0)->getPositionInStream();
     gridobject.getGridPointCoordinates( current, args );
     if( getName()=="KDE" ) {
       if( kerneltype=="DISCRETE" ) {
@@ -407,8 +418,8 @@ void KDE::performTask( const unsigned& current, MultiValue& myvals ) const {
       newval = hh*von_misses_norm*exp( von_misses_concentration*dot );
       for(unsigned i=0; i<der.size(); ++i) der[i] = von_misses_concentration*newval*args[i];
     }
-    myvals.setValue( valout, newval );
-    for(unsigned i=0; i<der.size(); ++i) { myvals.addDerivative( valout, i, der[i] ); myvals.updateIndex( valout, i ); }
+    myvals.setValue( 0, newval );
+    for(unsigned i=0; i<der.size(); ++i) { myvals.addDerivative( 0, i, der[i] ); myvals.updateIndex( 0, i ); }
   }
 }
 
@@ -473,8 +484,8 @@ void KDE::gatherStoredValue( const unsigned& valindex, const unsigned& code, con
   plumed_dbg_assert( valindex==0 );
   if( numberOfKernels==1 ) {
     unsigned istart = bufstart + (1+gridobject.getDimension())*code;
-    unsigned valout = getConstPntrToComponent(0)->getPositionInStream(); buffer[istart] += myvals.get( valout );
-    for(unsigned i=0; i<gridobject.getDimension(); ++i) buffer[istart+1+i] += myvals.getDerivative( valout, i );
+    buffer[istart] += myvals.get( 0 );
+    for(unsigned i=0; i<gridobject.getDimension(); ++i) buffer[istart+1+i] += myvals.getDerivative( 0, i );
     return;
   }
   std::vector<double> args( gridobject.getDimension() ); double height; retrieveArgumentsAndHeight( myvals, args, height );
@@ -520,21 +531,18 @@ void KDE::gatherStoredValue( const unsigned& valindex, const unsigned& code, con
   }
 }
 
-void KDE::updateForceTasksFromValue( const Value* myval, std::vector<unsigned>& force_tasks ) const {
-  if( !myval->forcesWereAdded() ) return ;
+bool KDE::checkForTaskForce( const unsigned& itask, const Value* myval ) const {
+  if( !myval->forcesWereAdded() ) return false;
   if( numberOfKernels==1 ) plumed_error();
-
-  int flag=1;
-  for(unsigned i=0; i<numberOfKernels; ++i) {
-    if( checkTaskStatus( i, flag ) ) force_tasks.push_back(i);
-  }
+  return checkTaskIsActive( itask );
 }
 
-void KDE::gatherForcesOnStoredValue( const Value* myval, const unsigned& itask, const MultiValue& myvals, std::vector<double>& forces ) const {
+void KDE::gatherForces( const unsigned& itask, const MultiValue& myvals, std::vector<double>& forces ) const {
   if( numberOfKernels==1 ) {
     plumed_error();
     return;
   }
+  if( !checkComponentsForForce() ) return;
   double height; std::vector<double> args( gridobject.getDimension() );
   retrieveArgumentsAndHeight( myvals, args, height );
   unsigned num_neigh; std::vector<unsigned> neighbors;
@@ -565,7 +573,7 @@ void KDE::gatherForcesOnStoredValue( const Value* myval, const unsigned& itask, 
       for(unsigned i=0; i<num_neigh; ++i) {
         gridobject.getGridPointCoordinates( neighbors[i], gpoint );
         double dot=0; for(unsigned j=0; j<gpoint.size(); ++j) dot += args[j]*gpoint[j];
-        double fforce = myval->getForce( neighbors[i] ); double newval = height*von_misses_norm*exp( von_misses_concentration*dot );
+        double fforce = getConstPntrToComponent(0)->getForce( neighbors[i] ); double newval = height*von_misses_norm*exp( von_misses_concentration*dot );
         if( hasheight && getPntrToArgument(args.size())->getRank()==0 ) forces[ hforce_start ] += newval*fforce / height;
         else if( hasheight ) forces[ hforce_start + getPntrToArgument(args.size())->getIndexInStore(itask) ] += newval*fforce / height;
         unsigned n=0; for(unsigned j=0; j<gpoint.size(); ++j) { forces[n + getPntrToArgument(j)->getIndexInStore(itask)] += von_misses_concentration*newval*gpoint[j]*fforce; n += getPntrToArgument(j)->getNumberOfStoredValues(); }

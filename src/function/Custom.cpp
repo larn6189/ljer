@@ -268,20 +268,23 @@ void Custom::registerKeywords(Keywords& keys) {
   keys.use("PERIODIC");
   keys.add("compulsory","FUNC","the function you wish to evaluate");
   keys.add("optional","VAR","the names to give each of the arguments in the function.  If you have up to three arguments in your function you can use x, y and z to refer to them.  Otherwise you must use this flag to give your variables names.");
+  keys.add("hidden","MASKED_INPUT_ALLOWED","turns on that you are allowed to use masked inputs ");
   keys.setValueDescription("an arbitrary function");
 }
 
 void Custom::read( ActionWithArguments* action ) {
   // Read in the variables
+  unsigned nargs = action->getNumberOfArguments(); ActionWithVector* av=dynamic_cast<ActionWithVector*>(action);
+  if( av && av->getNumberOfMasks()>0 ) nargs = nargs - av->getNumberOfMasks();
   std::vector<std::string> var; parseVector(action,"VAR",var); parse(action,"FUNC",func);
   if(var.size()==0) {
-    var.resize(action->getNumberOfArguments());
+    var.resize(nargs);
     if(var.size()>3) action->error("Using more than 3 arguments you should explicitly write their names with VAR");
     if(var.size()>0) var[0]="x";
     if(var.size()>1) var[1]="y";
     if(var.size()>2) var[2]="z";
   }
-  if(var.size()!=action->getNumberOfArguments()) action->error("Size of VAR array should be the same as number of arguments");
+  if(var.size()!=nargs) action->error("Size of VAR array should be the same as number of arguments");
   // Check for operations that are not multiplication (this can probably be done much more cleverly)
   bool onlymultiplication = func.find("*")!=std::string::npos;
   // Find first bracket in expression
@@ -320,7 +323,7 @@ void Custom::read( ActionWithArguments* action ) {
   action->log.printf("  with variables :");
   for(unsigned i=0; i<var.size(); i++) action->log.printf(" %s",var[i].c_str());
   action->log.printf("\n"); function.set( func, var, action );
-  std::vector<double> zeros( action->getNumberOfArguments(), 0 ); double fval = abs(function.evaluate(zeros));
+  std::vector<double> zeros( nargs, 0 ); double fval = abs(function.evaluate(zeros));
   zerowhenallzero=(fval<epsilon );
   if( zerowhenallzero ) action->log.printf("  not calculating when all arguments are zero \n");
 }
@@ -331,6 +334,28 @@ std::string Custom::getGraphInfo( const std::string& name ) const {
 
 bool Custom::getDerivativeZeroIfValueIsZero() const {
   return check_multiplication_vars.size()>0;
+}
+
+bool Custom::checkIfMaskAllowed( const std::vector<Value*>& args ) const {
+  bool nomask=true;
+  for(unsigned i=0; i<args.size(); ++i) {
+    bool found=false;
+    for(unsigned j=0; j<check_multiplication_vars.size(); ++j) {
+      if( i==check_multiplication_vars[j] ) { found=true; break; }
+    }
+    if( found ) continue;
+    ActionWithVector* av=dynamic_cast<ActionWithVector*>( args[i]->getPntrToAction() );
+    if( av && av->getNumberOfMasks()>=0 ) {
+      unsigned nargs = av->getNumberOfArguments(), nm = av->getNumberOfMasks();
+      for(unsigned k=nargs-nm; k<nargs; ++k ) {
+        nomask=false; Value* maskarg = av->getPntrToArgument( k );
+        for(unsigned j=0; j<check_multiplication_vars.size(); ++j) {
+          if( maskarg==args[check_multiplication_vars[j]] ) return true;
+        }
+      }
+    }
+  }
+  return nomask;
 }
 
 std::vector<Value*> Custom::getArgumentsToCheck( const std::vector<Value*>& args ) {

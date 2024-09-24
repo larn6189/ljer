@@ -48,6 +48,7 @@ class ActionAtomistic;
 class Value {
   friend class ActionWithValue;
   friend class ActionWithVector;
+  friend class ActionWithMatrix;
   friend class ActionAtomistic;
   friend class ActionWithArguments;
   friend class ActionWithVirtualAtom;
@@ -79,14 +80,12 @@ private:
   std::map<AtomNumber,Vector> gradients;
 /// The name of this quantiy
   std::string name;
-/// Are we storing the data for this value if it is vector or matrix
-  bool storedata;
 /// What is the shape of the value (0 dimensional=scalar, n dimensional with derivatives=grid, 1 dimensional no derivatives=vector, 2 dimensional no derivatives=matrix)
   std::vector<unsigned> shape;
 /// Does this quanity have derivatives
   bool hasDeriv;
 /// Variables for storing data
-  unsigned bufstart, streampos, matpos, ngrid_der, ncols, book_start;
+  unsigned bufstart, ngrid_der, ncols;
 /// If we are storing a matrix is it symmetric?
   bool symmetric;
 /// This is a bookeeping array that holds the non-zero elements of the "sparse" matrix
@@ -157,6 +156,8 @@ public:
   void clearInputForce();
 /// Special method for clearing forces on variables used by DataPassingObject
   void clearInputForce( const std::vector<AtomNumber>& index );
+/// Set hasForce equal to true
+  void addForce();
 /// Add some force on this value
   void addForce(double f);
 /// Add some force on the ival th component of this value
@@ -184,10 +185,10 @@ public:
   unsigned getRank() const ;
 /// Get the shape of the object that is contained in this value
   const std::vector<unsigned>& getShape() const ;
-/// This turns on storing of vectors/matrices
-  void buildDataStore( const bool forprint=false );
 /// Reshape the storage for sparse matrices
   void reshapeMatrixStore( const unsigned& n );
+/// Copy the matrix bookeeping stuff
+  void copyBookeepingArrayFromArgument( Value* myarg );
 /// Set the symmetric flag equal true for this matrix
   void setSymmetric( const bool& sym );
 /// Get the total number of scalars that are stored here
@@ -208,14 +209,6 @@ public:
   void setDerivativeIsZeroWhenValueIsZero();
 /// Return a bool that tells us if the derivative is zero when the value is zero
   bool isDerivativeZeroWhenValueIsZero() const ;
-///
-  unsigned getPositionInStream() const ;
-/// This stuff handles where to look for the start of the row that contains the row of the matrix
-  void setPositionInMatrixStash( const unsigned& p );
-  unsigned getPositionInMatrixStash() const ;
-/// This stuff handles where to keep the bookeeping stuff for storing the sparse matrix
-  void setMatrixBookeepingStart( const unsigned& b );
-  unsigned getMatrixBookeepingStart() const ;
 /// Convert the input index to its corresponding indices
   void convertIndexToindices(const std::size_t& index, std::vector<unsigned>& indices ) const ;
 /// Print out all the values in this Value
@@ -228,8 +221,6 @@ public:
   unsigned getRowLength( const unsigned& irow ) const ;
 ///
   unsigned getRowIndex( const unsigned& irow, const unsigned& jind ) const ;
-/// Are we storing this value
-  bool valueIsStored() const ;
 ///
   unsigned getNumberOfColumns() const ;
 ///
@@ -340,7 +331,13 @@ void Value::clearDerivatives( const bool force ) {
   if( !force && (valtype==constant || valtype==average) ) return;
 
   value_set=false;
-  if( data.size()>1 ) std::fill(data.begin()+1, data.end(), 0);
+  if( shape.size()>0 ) std::fill(data.begin(), data.end(), 0);
+  else if( data.size()>1 ) std::fill(data.begin()+1, data.end(), 0);
+}
+
+inline
+void Value::addForce() {
+  hasForce=true;
 }
 
 inline
@@ -427,45 +424,21 @@ bool Value::isDerivativeZeroWhenValueIsZero() const {
 }
 
 inline
-unsigned Value::getPositionInStream() const {
-  return streampos;
-}
-
-inline
-unsigned Value::getPositionInMatrixStash() const {
-  return matpos;
-}
-
-inline
-void Value::setMatrixBookeepingStart( const unsigned& b ) {
-  book_start = b;
-}
-
-inline
-unsigned Value::getMatrixBookeepingStart() const {
-  return book_start;
-}
-
-inline
 void Value::setMatrixBookeepingElement( const unsigned& i, const unsigned& n ) {
   plumed_dbg_assert( i<matrix_bookeeping.size() );
   matrix_bookeeping[i]=n;
 }
 
 inline
-bool Value::valueIsStored() const {
-  return storedata;
-}
-
-inline
 unsigned Value::getRowLength( const unsigned& irow ) const {
+  if( matrix_bookeeping.size()==0 ) return 0;
   plumed_dbg_assert( (1+ncols)*irow<matrix_bookeeping.size() );
   return matrix_bookeeping[(1+ncols)*irow];
 }
 
 inline
 unsigned Value::getRowIndex( const unsigned& irow, const unsigned& jind ) const {
-  plumed_dbg_assert( (1+ncols)*irow+1+jind<matrix_bookeeping.size() && jind<matrix_bookeeping[(1+ncols)*irow] );
+  plumed_dbg_massert( (1+ncols)*irow+1+jind<matrix_bookeeping.size() && jind<matrix_bookeeping[(1+ncols)*irow], "failing in value " + name );
   return matrix_bookeeping[(1+ncols)*irow+1+jind];
 }
 
