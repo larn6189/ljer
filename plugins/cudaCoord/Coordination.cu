@@ -218,8 +218,10 @@ void CudaCoordination<calculateFloat>::calculate() {
   CUDAHELPERS::plmdDataFromGPU (cudaDerivatives, deriv, streamDerivatives);
 
   auto N = t2br;
-
-  while (N > 1) {
+  // if (N>1){
+  //maybe if N=1 it is more efficient to not do the reduction
+  //or to sneakily invert the two groups
+  do {
     size_t runningThreads = CUDAHELPERS::threadsPerBlock (
                               ceil (double (N) / dataperthread), maxReductionNumThreads);
 
@@ -256,7 +258,13 @@ void CudaCoordination<calculateFloat>::calculate() {
     }
 
     N = nGroups;
-  }
+  } while (N > 1);
+  // }else {
+  //   CUDAHELPERS::plmdDataFromGPU (
+  //       cudaVirial, virial, streamVirial);
+  //     // TODO:find a way to stream this
+  //     coordination = cudaCoordination[0];
+  // }
 
   // in this way we do not resize with additional memory allocation
   if (reductionMemoryCoord.size() > cudaCoordination.size())
@@ -445,7 +453,8 @@ getCoordDual (const unsigned natActive,
               const PLMD::GPU::ortoPBCs<calculateFloat> myPBC,
               const calculateFloat *coordActive,
               const calculateFloat *coordLoop,
-              const unsigned *trueIndexes,
+              const unsigned *trueIndexesActive,
+              const unsigned *trueIndexesLoop,
               calculateFloat *ncoordOut,
               calculateFloat *devOut,
               calculateFloat *virialOut) {
@@ -464,7 +473,7 @@ getCoordDual (const unsigned natActive,
   }
   // we try working with less global memory possible, so we set up a bunch of
   // temporary variables
-  const unsigned idx = trueIndexes[i];
+  const unsigned idx = trueIndexesActive[i];
   // local results
   calculateFloat mydevX = 0.0;
   calculateFloat mydevY = 0.0;
@@ -493,7 +502,7 @@ getCoordDual (const unsigned natActive,
     // const unsigned j = threadIdx.y + blockIdx.y * blockDim.y;
 
     // Safeguard
-    if (idx == trueIndexes[j])
+    if (idx == trueIndexesLoop[j])
       continue;
 
     d_0 = calculatePBC<usePBC> (coordLoop[X (j)] - x, myPBC.X);
@@ -550,7 +559,8 @@ getDerivDual (const unsigned natLoop,
               const PLMD::GPU::ortoPBCs<calculateFloat> myPBC,
               const calculateFloat *coordLoop,
               const calculateFloat *coordActive,
-              const unsigned *trueIndexes,
+              const unsigned *trueIndexesActive,
+              const unsigned *trueIndexesLoop,
               calculateFloat *devOut) {
   // auto sdata = shared_memory_proxy<calculateFloat>();
   // // loading shared memory
@@ -567,7 +577,7 @@ getDerivDual (const unsigned natLoop,
   }
   // we try working with less global memory possible, so we set up a bunch of
   // temporary variables
-  const unsigned idx = trueIndexes[i];
+  const unsigned idx = trueIndexesActive[i];
   // local results
   calculateFloat mydevX = 0.0;
   calculateFloat mydevY = 0.0;
@@ -597,7 +607,7 @@ getDerivDual (const unsigned natLoop,
     // const unsigned j = threadIdx.y + blockIdx.y * blockDim.y;
 
     // Safeguard
-    if (idx == trueIndexes[j])
+    if (idx == trueIndexesLoop[j])
       continue;
 
     d_0 = calculatePBC<usePBC> (coordLoop[X (j)] - x, myPBC.X);
@@ -639,6 +649,7 @@ size_t CudaCoordination<calculateFloat>::doDual() {
                    thrust::raw_pointer_cast (cudaPositions.data()),
                    thrust::raw_pointer_cast (cudaPositions.data()) + 3 * atomsInA,
                    thrust::raw_pointer_cast (cudaTrueIndexes.data()),
+                   thrust::raw_pointer_cast (cudaTrueIndexes.data()) + atomsInA,
                    thrust::raw_pointer_cast (cudaCoordination.data()),
                    thrust::raw_pointer_cast (cudaDerivatives.data()),
                    thrust::raw_pointer_cast (cudaVirial.data()));
@@ -654,6 +665,7 @@ size_t CudaCoordination<calculateFloat>::doDual() {
                    thrust::raw_pointer_cast (cudaPositions.data()),
                    thrust::raw_pointer_cast (cudaPositions.data()) + 3 * atomsInA,
                    thrust::raw_pointer_cast (cudaTrueIndexes.data()),
+                   thrust::raw_pointer_cast (cudaTrueIndexes.data()) + atomsInA,
                    thrust::raw_pointer_cast (cudaDerivatives.data()) + 3 * atomsInA);
   } else {
     getCoordDual<false><<<ngroupsA,
@@ -667,6 +679,7 @@ size_t CudaCoordination<calculateFloat>::doDual() {
                    thrust::raw_pointer_cast (cudaPositions.data()),
                    thrust::raw_pointer_cast (cudaPositions.data()) + 3 * atomsInA,
                    thrust::raw_pointer_cast (cudaTrueIndexes.data()),
+                   thrust::raw_pointer_cast (cudaTrueIndexes.data()) + atomsInA,
                    thrust::raw_pointer_cast (cudaCoordination.data()),
                    thrust::raw_pointer_cast (cudaDerivatives.data()),
                    thrust::raw_pointer_cast (cudaVirial.data()));
@@ -682,6 +695,7 @@ size_t CudaCoordination<calculateFloat>::doDual() {
                    thrust::raw_pointer_cast (cudaPositions.data()),
                    thrust::raw_pointer_cast (cudaPositions.data()) + 3 * atomsInA,
                    thrust::raw_pointer_cast (cudaTrueIndexes.data()),
+                   thrust::raw_pointer_cast (cudaTrueIndexes.data()) + atomsInA,
                    thrust::raw_pointer_cast (cudaDerivatives.data()) + 3 * atomsInA);
   }
   return atomsInA;
