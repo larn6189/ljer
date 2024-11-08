@@ -559,8 +559,8 @@ getDerivDual (const unsigned natLoop,
               const PLMD::GPU::ortoPBCs<calculateFloat> myPBC,
               const calculateFloat *coordLoop,
               const calculateFloat *coordActive,
-              const unsigned *trueIndexesActive,
               const unsigned *trueIndexesLoop,
+              const unsigned *trueIndexesActive,
               calculateFloat *devOut) {
   // auto sdata = shared_memory_proxy<calculateFloat>();
   // // loading shared memory
@@ -583,18 +583,7 @@ getDerivDual (const unsigned natLoop,
   calculateFloat mydevY = 0.0;
   calculateFloat mydevZ = 0.0;
   calculateFloat mycoord = 0.0;
-  // the previous version used static array for myVirial and d
-  // using explicit variables guarantees that this data will be stored in
-  // registers
-  calculateFloat myVirial_0 = 0.0;
-  calculateFloat myVirial_1 = 0.0;
-  calculateFloat myVirial_2 = 0.0;
-  calculateFloat myVirial_3 = 0.0;
-  calculateFloat myVirial_4 = 0.0;
-  calculateFloat myVirial_5 = 0.0;
-  calculateFloat myVirial_6 = 0.0;
-  calculateFloat myVirial_7 = 0.0;
-  calculateFloat myVirial_8 = 0.0;
+  
   // local calculation aid
   const calculateFloat x = coordActive[X (i)];
   const calculateFloat y = coordActive[Y (i)];
