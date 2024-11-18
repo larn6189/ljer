@@ -1,0 +1,4 @@
+# .git-blame-ignore-revs
+# https://docs.github.com/en/repositories/working-with-files/using-files/viewing-a-file#ignore-commits-in-the-blame-view
+# new astyle applied to v2.9
+33f1cb86c61c13ef7c545444113ae60f6dd628fd
