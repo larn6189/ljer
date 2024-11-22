@@ -62,19 +62,15 @@ namespace colvar {
 class Plane : public Colvar {
 private:
   bool pbc;
-  std::vector<double> value, masses, charges;
+  std::vector<double> value;
   std::vector<std::vector<Vector> > derivs;
   std::vector<Tensor> virial;
 public:
   static void registerKeywords( Keywords& keys );
   explicit Plane(const ActionOptions&);
-  static void parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa );
-  static unsigned getModeAndSetupValues( ActionWithValue* av );
 // active methods:
   void calculate() override;
-  static void calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                           const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                           std::vector<Tensor>& virial, const ActionAtomistic* aa );
+  MULTICOLVAR_DEFAULT(multiColvars::emptyMode);
 };
 
 typedef ColvarShortcut<Plane> PlaneShortcut;
@@ -92,7 +88,7 @@ void Plane::registerKeywords( Keywords& keys ) {
   keys.add("hidden","NO_ACTION_LOG","suppresses printing from action on the log");
 }
 
-void Plane::parseAtomList( const int& num, std::vector<AtomNumber>& atoms, ActionAtomistic* aa ) {
+void Plane::parseAtomList( int const num, std::vector<AtomNumber>& atoms, ActionAtomistic* aa ) {
   aa->parseAtomList("ATOMS",num,atoms);
   if(atoms.size()==3) {
     aa->log.printf("  containing atoms %d %d %d\n",atoms[0].serial(),atoms[1].serial(),atoms[2].serial());
@@ -104,11 +100,11 @@ void Plane::parseAtomList( const int& num, std::vector<AtomNumber>& atoms, Actio
   } else if( num<0 || atoms.size()>0 ) aa->error("Number of specified atoms should be either 3 or 4");
 }
 
-unsigned Plane::getModeAndSetupValues( ActionWithValue* av ) {
+Plane::Modetype Plane::getModeAndSetupValues( ActionWithValue* av ) {
   av->addComponentWithDerivatives("x"); av->componentIsNotPeriodic("x");
   av->addComponentWithDerivatives("y"); av->componentIsNotPeriodic("y");
   av->addComponentWithDerivatives("z"); av->componentIsNotPeriodic("z");
-  return 0;
+  return {};
 }
 
 Plane::Plane(const ActionOptions&ao):
@@ -127,7 +123,7 @@ Plane::Plane(const ActionOptions&ao):
   if(pbc) log.printf("  using periodic boundary conditions\n");
   else    log.printf("  without periodic boundary conditions\n");
 
-  unsigned mode = getModeAndSetupValues( this );
+  /*Modetype mode = */getModeAndSetupValues( this );
   requestAtoms(atoms);
   checkRead();
 }
@@ -135,15 +131,19 @@ Plane::Plane(const ActionOptions&ao):
 void Plane::calculate() {
 
   if(pbc) makeWhole();
-  calculateCV( 0, masses, charges, getPositions(), value, derivs, virial, this );
+  calculateCV( {}, multiColvars::Input().positions(getPositions()), multiColvars::Ouput(value, derivs, virial), this );
   setValue( value[0] );
   for(unsigned i=0; i<derivs[0].size(); ++i) setAtomsDerivatives( i, derivs[0][i] );
   setBoxDerivatives( virial[0] );
 }
 
-void Plane::calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                         const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                         std::vector<Tensor>& virial, const ActionAtomistic* aa ) {
+void Plane::calculateCV( Modetype /*mode*/,
+                         multiColvars::Input const in,
+                         multiColvars::Ouput out, const ActionAtomistic* aa ) {
+  auto & vals=out.vals();
+  auto & derivs=out.derivs();
+  auto & virial=out.virial();
+  const auto & pos = in.positions();
   Vector d1=delta( pos[1], pos[0] );
   Vector d2=delta( pos[2], pos[3] );
   Vector cp = crossProduct( d1, d2 );

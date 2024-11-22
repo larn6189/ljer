@@ -79,24 +79,22 @@ Calculate a vector of dipole moments for a set of groups of atoms.
 //+ENDPLUMEDOC
 
 class Dipole : public Colvar {
+public:
+  explicit Dipole(const ActionOptions&);
+  void calculate() override;
+  static void registerKeywords(Keywords& keys);
+  MULTICOLVAR_DEFAULT(multiColvars::components);
+private:
   std::vector<AtomNumber> ga_lista;
-  bool components;
-  bool nopbc;
-  std::vector<double> value, masses, charges;
+  std::vector<double> value;
+  std::vector<double> charges;
   std::vector<std::vector<Vector> > derivs;
   std::vector<Tensor> virial;
   Value* valuex=nullptr;
   Value* valuey=nullptr;
   Value* valuez=nullptr;
-public:
-  explicit Dipole(const ActionOptions&);
-  static void parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa );
-  static unsigned getModeAndSetupValues( ActionWithValue* av );
-  void calculate() override;
-  static void registerKeywords(Keywords& keys);
-  static void calculateCV( const unsigned& mode, const std::vector<double>& masses, std::vector<double>& charges,
-                           const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                           std::vector<Tensor>& virial, const ActionAtomistic* aa );
+  Modetype components;
+  bool nopbc=false;
 };
 
 typedef ColvarShortcut<Dipole> DipoleShortcut;
@@ -118,20 +116,24 @@ void Dipole::registerKeywords(Keywords& keys) {
 
 Dipole::Dipole(const ActionOptions&ao):
   PLUMED_COLVAR_INIT(ao),
-  components(false),
+
   value(1),
   derivs(1),
-  virial(1)
+  virial(1),
+  components(getModeAndSetupValues(this))
 {
-  parseAtomList(-1,ga_lista,this); charges.resize(ga_lista.size());
-  components=(getModeAndSetupValues(this)==1);
-  if( components ) {
+  parseAtomList(-1,ga_lista,this);
+  charges.resize(ga_lista.size());
+  // components=getModeAndSetupValues(this);
+  if( components == Modetype::withCompontents ) {
     value.resize(3); derivs.resize(3); virial.resize(3);
     valuex=getPntrToComponent("x");
     valuey=getPntrToComponent("y");
     valuez=getPntrToComponent("z");
   }
-  for(unsigned i=0; i<derivs.size(); ++i) derivs[i].resize( ga_lista.size() );
+  for(unsigned i=0; i<derivs.size(); ++i) {
+    derivs[i].resize( ga_lista.size() );
+  }
   parseFlag("NOPBC",nopbc);
   checkRead();
 
@@ -141,7 +143,7 @@ Dipole::Dipole(const ActionOptions&ao):
   requestAtoms(ga_lista);
 }
 
-void Dipole::parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
+void Dipole::parseAtomList( int num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
   aa->parseAtomList("GROUP",num,t);
   if( t.size()>0 ) {
     aa->log.printf("  of %u atoms\n",static_cast<unsigned>(t.size()));
@@ -152,15 +154,17 @@ void Dipole::parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAt
   }
 }
 
-unsigned Dipole::getModeAndSetupValues( ActionWithValue* av ) {
-  bool c; av->parseFlag("COMPONENTS",c);
+Dipole::Modetype Dipole::getModeAndSetupValues( ActionWithValue* av ) {
+  bool c;
+  av->parseFlag("COMPONENTS",c);
   if( c ) {
     av->addComponentWithDerivatives("x"); av->componentIsNotPeriodic("x");
     av->addComponentWithDerivatives("y"); av->componentIsNotPeriodic("y");
     av->addComponentWithDerivatives("z"); av->componentIsNotPeriodic("z");
-    return 1;
+    return Modetype::withCompontents;
   }
-  av->addValueWithDerivatives(); av->setNotPeriodic(); return 0;
+  av->addValueWithDerivatives(); av->setNotPeriodic();
+  return Modetype::noComponents;
 }
 
 // calculator
@@ -169,14 +173,14 @@ void Dipole::calculate()
   if(!nopbc) makeWhole();
   unsigned N=getNumberOfAtoms();
   for(unsigned i=0; i<N; ++i) charges[i]=getCharge(i);
-
-  if(!components) {
-    calculateCV( 0, masses, charges, getPositions(), value, derivs, virial, this );
+  auto inputs = multiColvars::Input().positions(getPositions())
+                .charges(charges);
+  calculateCV( components, inputs, multiColvars::Ouput(value, derivs, virial), this );
+  if(components == Modetype::noComponents) {
     for(unsigned i=0; i<N; i++) setAtomsDerivatives(i,derivs[0][i]);
     setBoxDerivatives(virial[0]);
     setValue(value[0]);
   } else {
-    calculateCV( 1, masses, charges, getPositions(), value, derivs, virial, this );
     for(unsigned i=0; i<N; i++) {
       setAtomsDerivatives(valuex,i,derivs[0][i]);
       setAtomsDerivatives(valuey,i,derivs[1][i]);
@@ -191,25 +195,40 @@ void Dipole::calculate()
   }
 }
 
-void Dipole::calculateCV( const unsigned& mode, const std::vector<double>& masses, std::vector<double>& charges,
-                          const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                          std::vector<Tensor>& virial, const ActionAtomistic* aa ) {
-  unsigned N=pos.size(); double ctot=0.;
-  for(unsigned i=0; i<N; ++i) ctot += charges[i];
+void Dipole::calculateCV( Modetype mode,
+                          multiColvars::Input const in,
+                          multiColvars::Ouput out,
+                          const ActionAtomistic* aa ) {
+  auto & vals=out.vals();
+  auto & derivs=out.derivs();
+  auto & virial=out.virial();
+  const auto & pos=in.positions();
+  auto & charges=in.var_charges();
+  unsigned N=pos.size();
+  double ctot=0.;
+  for(unsigned i=0; i<N; ++i) {
+    ctot += charges[i];
+  }
+  //check if
+  //std::accumulate(charges.begin(),charges.end(),ctot);
+  // is faster
   ctot/=(double)N;
 
   Vector dipje;
   for(unsigned i=0; i<N; ++i) {
-    charges[i]-=ctot; dipje += charges[i]*pos[i];
+    charges[i]-=ctot;
+    dipje += charges[i]*pos[i];
   }
 
-  if( mode==1 ) {
+  if( mode==Modetype::withCompontents ) {
     for(unsigned i=0; i<N; i++) {
-      derivs[0][i]=charges[i]*Vector(1.0,0.0,0.0);
-      derivs[1][i]=charges[i]*Vector(0.0,1.0,0.0);
-      derivs[2][i]=charges[i]*Vector(0.0,0.0,1.0);
+      derivs[0][i]=Vector(charges[i],0.0,0.0);
+      derivs[1][i]=Vector(0.0,charges[i],0.0);
+      derivs[2][i]=Vector(0.0,0.0,charges[i]);
     }
-    for(unsigned i=0; i<3; ++i ) vals[i] = dipje[i];
+    for(unsigned i=0; i<3; ++i ) {
+      vals[i] = dipje[i];
+    }
   } else {
     vals[0] = dipje.modulo();
     double idip = 1./vals[0];

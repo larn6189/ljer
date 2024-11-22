@@ -97,19 +97,15 @@ See \ref QUATERNION for more details
 class Quaternion : public Colvar {
 private:
   bool pbc;
-  std::vector<double> value, masses, charges;
+  std::vector<double> value;
   std::vector<std::vector<Vector> > derivs;
   std::vector<Tensor> virial;
 public:
   static void registerKeywords( Keywords& keys );
   explicit Quaternion(const ActionOptions&);
-  static void parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa );
-  static unsigned getModeAndSetupValues( ActionWithValue* av );
 // active methods:
   void calculate() override;
-  static void calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                           const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                           std::vector<Tensor>& virial, const ActionAtomistic* aa );
+  MULTICOLVAR_DEFAULT(::PLMD::colvar::multiColvars::emptyMode);
 };
 
 typedef colvar::ColvarShortcut<Quaternion> QuaternionShortcut;
@@ -145,28 +141,28 @@ Quaternion::Quaternion(const ActionOptions&ao):
   parseFlag("NOPBC",nopbc);
   pbc=!nopbc;
 
-  unsigned mode = getModeAndSetupValues( this );
+  /*Modetype mode =*/ getModeAndSetupValues( this );
   requestAtoms(atoms);
 }
 
-void Quaternion::parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
+void Quaternion::parseAtomList(int num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
   aa->parseAtomList("ATOMS",num,t);
   if( t.size()==3 ) aa->log.printf("  involving atoms %d %d %d\n",t[0].serial(),t[1].serial(),t[0].serial());
 }
 
-unsigned Quaternion::getModeAndSetupValues( ActionWithValue* av ) {
+Quaternion::Modetype Quaternion::getModeAndSetupValues( ActionWithValue* av ) {
   // This sets up values that we can pass around in PLUMED
   av->addComponentWithDerivatives("w"); av->componentIsNotPeriodic("w");
   av->addComponentWithDerivatives("i"); av->componentIsNotPeriodic("i");
   av->addComponentWithDerivatives("j"); av->componentIsNotPeriodic("j");
   av->addComponentWithDerivatives("k"); av->componentIsNotPeriodic("k");
-  return 0;
+  return {};
 }
 
 void Quaternion::calculate() {
   if(pbc) makeWhole();
 
-  calculateCV( 0, masses, charges, getPositions(), value, derivs, virial, this );
+  calculateCV( {}, PLMD::colvar::multiColvars::Input().positions(getPositions()), PLMD::colvar::multiColvars::Ouput(value, derivs, virial), this );
   for(unsigned j=0; j<4; ++j) {
     Value* valuej=getPntrToComponent(j);
     for(unsigned i=0; i<3; ++i) setAtomsDerivatives(valuej,i,derivs[j][i] );
@@ -176,9 +172,13 @@ void Quaternion::calculate() {
 }
 
 // calculator
-void Quaternion::calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                              const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                              std::vector<Tensor>& virial, const ActionAtomistic* aa ) {
+void Quaternion::calculateCV( Modetype /*mode*/,
+                              PLMD::colvar::multiColvars::Input const in,
+                              PLMD::colvar::multiColvars::Ouput out, const ActionAtomistic* aa ) {
+  auto & vals=out.vals();
+  auto & derivs=out.derivs();
+  auto & virial=out.virial();
+  const auto & pos = in.positions();
   //declarations
   Vector vec1_comp = delta( pos[0], pos[1] ); //components between atom 1 and 2
   Vector vec2_comp = delta( pos[0], pos[2] ); //components between atom 1 and 3

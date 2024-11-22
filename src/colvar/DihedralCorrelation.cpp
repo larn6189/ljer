@@ -64,18 +64,14 @@ Measure the correlation between a multiple pairs of dihedral angles
 class DihedralCorrelation : public Colvar {
 private:
   bool pbc;
-  std::vector<double> value, masses, charges;
+  std::vector<double> value;
   std::vector<std::vector<Vector> > derivs;
   std::vector<Tensor> virial;
 public:
+  MULTICOLVAR_DEFAULT(multiColvars::emptyMode);
   static void registerKeywords( Keywords& keys );
   explicit DihedralCorrelation(const ActionOptions&);
-  static void parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa );
-  static unsigned getModeAndSetupValues( ActionWithValue* av );
   void calculate() override;
-  static void calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                           const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                           std::vector<Tensor>& virial, const ActionAtomistic* aa );
 };
 
 typedef ColvarShortcut<DihedralCorrelation> DihedralCorrelationShortcut;
@@ -110,7 +106,7 @@ DihedralCorrelation::DihedralCorrelation(const ActionOptions&ao):
   else    log.printf("  without periodic boundary conditions\n");
 }
 
-void DihedralCorrelation::parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
+void DihedralCorrelation::parseAtomList( int const num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
   aa->parseAtomList("ATOMS",num,t);
   if( num<0 && t.size()!=8 ) aa->error("Number of specified atoms should be 8");
   if( t.size()==8 ) {
@@ -119,22 +115,28 @@ void DihedralCorrelation::parseAtomList( const int& num, std::vector<AtomNumber>
   }
 }
 
-unsigned DihedralCorrelation::getModeAndSetupValues( ActionWithValue* av ) {
-  av->addValueWithDerivatives(); av->setNotPeriodic(); return 0;
+DihedralCorrelation::Modetype DihedralCorrelation::getModeAndSetupValues( ActionWithValue* av ) {
+  av->addValueWithDerivatives();
+  av->setNotPeriodic();
+  return {};
 }
 
 void DihedralCorrelation::calculate() {
 
   if(pbc) makeWhole();
-  calculateCV( 0, masses, charges, getPositions(), value, derivs, virial, this );
+  calculateCV( {}, multiColvars::Input().positions(getPositions()), multiColvars::Ouput(value, derivs, virial), this );
   setValue( value[0] );
   for(unsigned i=0; i<derivs[0].size(); ++i) setAtomsDerivatives( i, derivs[0][i] );
   setBoxDerivatives( virial[0] );
 }
 
-void DihedralCorrelation::calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                                       const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                                       std::vector<Tensor>& virial, const ActionAtomistic* aa ) {
+void DihedralCorrelation::calculateCV(Modetype  /*mode*/,
+                                      multiColvars::Input const in,
+                                      multiColvars::Ouput out, const ActionAtomistic* aa ) {
+  auto & vals=out.vals();
+  auto & derivs=out.derivs();
+  auto & virial=out.virial();
+  const auto& pos = in.positions();
   const Vector d10=delta(pos[1],pos[0]);
   const Vector d11=delta(pos[2],pos[1]);
   const Vector d12=delta(pos[3],pos[2]);

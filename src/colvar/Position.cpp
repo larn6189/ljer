@@ -91,21 +91,18 @@ Create a vector that holds the components of the position of a set of atoms.
 //+ENDPLUMEDOC
 
 class Position : public Colvar {
-  bool scaled_components;
-  bool pbc;
-  std::vector<double> value, masses, charges;
-  std::vector<std::vector<Vector> > derivs;
-  std::vector<Tensor> virial;
 public:
   static void registerKeywords( Keywords& keys );
   explicit Position(const ActionOptions&);
-  static void parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa );
-  static unsigned getModeAndSetupValues( ActionWithValue* av );
 // active methods:
   void calculate() override;
-  static void calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                           const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                           std::vector<Tensor>& virial, const ActionAtomistic* aa );
+  MULTICOLVAR_DEFAULT(multiColvars::plainOrScaled);
+private:
+  Modetype components;
+  bool pbc;
+  std::vector<double> value;
+  std::vector<std::vector<Vector> > derivs;
+  std::vector<Tensor> virial;
 };
 
 typedef ColvarShortcut<Position> PositionShortcut;
@@ -131,7 +128,6 @@ void Position::registerKeywords( Keywords& keys ) {
 
 Position::Position(const ActionOptions&ao):
   PLUMED_COLVAR_INIT(ao),
-  scaled_components(false),
   pbc(true),
   value(3),
   derivs(3),
@@ -139,8 +135,7 @@ Position::Position(const ActionOptions&ao):
 {
   for(unsigned i=0; i<3; ++i) derivs[i].resize(1);
   std::vector<AtomNumber> atoms; parseAtomList(-1,atoms,this);
-  unsigned mode=getModeAndSetupValues(this);
-  if( mode==1 ) scaled_components=true;
+  components=getModeAndSetupValues(this);
 
   bool nopbc=!pbc;
   parseFlag("NOPBC",nopbc);
@@ -153,25 +148,26 @@ Position::Position(const ActionOptions&ao):
   requestAtoms(atoms);
 }
 
-void Position::parseAtomList( const int& num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
+void Position::parseAtomList(int const num, std::vector<AtomNumber>& t, ActionAtomistic* aa ) {
   aa->parseAtomList("ATOM",num,t);
   if( t.size()==1 ) aa->log.printf("  for atom %d\n",t[0].serial());
   else if( num<0 || t.size()!=0 ) aa->error("Number of specified atoms should be 1");
 }
 
-unsigned Position::getModeAndSetupValues( ActionWithValue* av ) {
-  bool sc; av->parseFlag("SCALED_COMPONENTS",sc);
+Position::Modetype Position::getModeAndSetupValues( ActionWithValue* av ) {
+  bool sc;
+  av->parseFlag("SCALED_COMPONENTS",sc);
   if(sc) {
     av->addComponentWithDerivatives("a"); av->componentIsPeriodic("a","-0.5","+0.5");
     av->addComponentWithDerivatives("b"); av->componentIsPeriodic("b","-0.5","+0.5");
     av->addComponentWithDerivatives("c"); av->componentIsPeriodic("c","-0.5","+0.5");
-    return 1;
+    return Modetype::scaled;
   }
   av->addComponentWithDerivatives("x"); av->componentIsNotPeriodic("x");
   av->addComponentWithDerivatives("y"); av->componentIsNotPeriodic("y");
   av->addComponentWithDerivatives("z"); av->componentIsNotPeriodic("z");
   av->log<<"  WARNING: components will not have the proper periodicity - see manual\n";
-  return 0;
+  return Modetype::plain;
 }
 
 // calculator
@@ -183,9 +179,9 @@ void Position::calculate() {
   } else {
     distance[0]=delta(Vector(0.0,0.0,0.0),getPosition(0));
   }
-
-  if(scaled_components) {
-    calculateCV( 1, masses, charges, distance, value, derivs, virial, this );
+  calculateCV( components, multiColvars::Input().positions(distance), multiColvars::Ouput(value, derivs, virial), this );
+  switch (components) {
+  case Modetype::scaled: {
     Value* valuea=getPntrToComponent("a");
     Value* valueb=getPntrToComponent("b");
     Value* valuec=getPntrToComponent("c");
@@ -195,8 +191,10 @@ void Position::calculate() {
     valueb->set(value[1]);
     setAtomsDerivatives (valuec,0,derivs[2][0]);
     valuec->set(value[2]);
-  } else {
-    calculateCV( 0, masses, charges, distance, value, derivs, virial, this );
+  }
+  break;
+
+  case Modetype::plain: {
     Value* valuex=getPntrToComponent("x");
     Value* valuey=getPntrToComponent("y");
     Value* valuez=getPntrToComponent("z");
@@ -213,26 +211,37 @@ void Position::calculate() {
     setBoxDerivatives   (valuez,virial[2]);
     valuez->set(value[2]);
   }
+  }
 }
 
-void Position::calculateCV( const unsigned& mode, const std::vector<double>& masses, const std::vector<double>& charges,
-                            const std::vector<Vector>& pos, std::vector<double>& vals, std::vector<std::vector<Vector> >& derivs,
-                            std::vector<Tensor>& virial, const ActionAtomistic* aa ) {
-  if( mode==1 ) {
+void Position::calculateCV( Modetype mode,
+                            multiColvars::Input const in,
+                            multiColvars::Ouput out, const ActionAtomistic* aa ) {
+  auto & vals=out.vals();
+  auto & derivs=out.derivs();
+  auto & virial=out.virial();
+  const auto &pos = in.positions();
+  ////////////////////////////////////////////////////////////////////////////
+  //why here there is not the distance from 000 treatment??????
+  ///////////////////////////////////////////////////////////////////////////
+  switch (mode)
+  {
+  case Modetype::scaled: {
     Vector d=aa->getPbc().realToScaled(pos[0]);
     vals[0]=Tools::pbc(d[0]); vals[1]=Tools::pbc(d[1]); vals[2]=Tools::pbc(d[2]);
     derivs[0][0]=matmul(aa->getPbc().getInvBox(),Vector(+1,0,0));
     derivs[1][0]=matmul(aa->getPbc().getInvBox(),Vector(0,+1,0));
     derivs[2][0]=matmul(aa->getPbc().getInvBox(),Vector(0,0,+1));
-  } else {
+  }
+  break;
+
+  case Modetype::plain: {
     for(unsigned i=0; i<3; ++i) vals[i]=pos[0][i];
     derivs[0][0]=Vector(+1,0,0); derivs[1][0]=Vector(0,+1,0); derivs[2][0]=Vector(0,0,+1);
     virial[0]=Tensor(pos[0],Vector(-1,0,0)); virial[1]=Tensor(pos[0],Vector(0,-1,0)); virial[2]=Tensor(pos[0],Vector(0,0,-1));
   }
+  }
 }
 
-}
-}
-
-
-
+} // namespace colvar
+} // namespacs PLMD
