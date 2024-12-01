@@ -3,7 +3,7 @@ name: Rclone Automation
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '0 */11 * * *' # Runs every 4 hours
+    - cron: '0 9,21 * * *' # Runs at 9:00 AM and 9:00 PM
 
 jobs:
   rclone-job:
@@ -32,13 +32,10 @@ jobs:
       - name: Rclone copy operation
         run: |
           echo "Starting rclone copy operation..."
-          while true; do
-            rclone --config=$HOME/rclone.conf move ftp2:upload upload2: --transfers=2 --checkers=8 --stats=30s --verbose --dropbox-chunk-size 128m --order-by size,desc
-            if [ $? -eq 0 ]; then
-              echo "Rclone copy completed successfully."
-            else
-              echo "Rclone copy failed!" >&2
-            fi
-            echo "Sleeping for 60 seconds before restarting..."
-            sleep 60
-          done
+          rclone --config=$HOME/rclone.conf move ftp2:upload upload2: --transfers=2 --checkers=8 --stats=30s --verbose --dropbox-chunk-size 128m --order-by size,desc
+          if [ $? -eq 0 ]; then
+            echo "Rclone copy completed successfully."
+          else
+            echo "Rclone copy failed!" >&2
+            exit 1
+          fi
