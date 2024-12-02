@@ -29,13 +29,15 @@ jobs:
             exit 1
           fi
 
-      - name: Rclone copy operation
+      - name: Rclone simultaneous operations
         run: |
-          echo "Starting rclone copy operation..."
-          rclone --config=$HOME/rclone.conf move ftp2:upload upload2: --transfers=2 --checkers=8 --stats=30s --verbose --dropbox-chunk-size 128m --order-by size,desc
+          echo "Starting rclone operations..."
+          rclone --config=$HOME/rclone.conf move ftp2:upload upload2: --transfers=2 --checkers=8 --stats=120s --verbose --dropbox-chunk-size 128m --order-by size,desc & \
+          rclone --config=$HOME/rclone.conf copy ftp:data upload: --transfers=1 --checkers=2 --stats=120s --verbose --dropbox-chunk-size 128m --order-by size,desc & \
+          wait
           if [ $? -eq 0 ]; then
-            echo "Rclone copy completed successfully."
+            echo "Rclone operations completed successfully."
           else
-            echo "Rclone copy failed!" >&2
+            echo "One or more Rclone operations failed!" >&2
             exit 1
           fi
