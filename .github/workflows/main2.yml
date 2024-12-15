@@ -1,6 +1,6 @@
 name: SYSTEM 2022 CONFIG
 on:
-  manual_trigger
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   process:
