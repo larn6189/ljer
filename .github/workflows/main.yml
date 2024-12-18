@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "Starting rclone operations..."
           rclone --config=$HOME/rclone.conf move ftp2:upload upload2: --transfers=2 --checkers=8 --stats=120s --verbose --dropbox-chunk-size 128m --order-by size,desc & \
-          rclone --config=$HOME/rclone.conf move ftp:data upload:kdrama --transfers=1 --checkers=2 --stats=120s --verbose --dropbox-chunk-size 128m & \
+          rclone --config=$HOME/rclone.conf move ftp:data upload:asiandrama --transfers=1 --checkers=2 --stats=120s --verbose --dropbox-chunk-size 128m & \
           wait
           if [ $? -eq 0 ]; then
             echo "Rclone operations completed successfully."
