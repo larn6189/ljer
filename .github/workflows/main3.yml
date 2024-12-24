@@ -19,7 +19,7 @@ jobs:
       FTP_USER: root
       FTP_PASS: root
       FTP_PORT: 25252
-      RCLONE_CONFIG: $HOME/rclone.conf
+      RCLONE_CONFIG: /tmp/rclone.conf
 
     steps:
       - name: Set up environment
@@ -34,7 +34,7 @@ jobs:
       - name: Download Rclone config file
         run: |
           echo "Downloading Rclone config..."
-          wget -q -O $RCLONE_CONFIG "${{ secrets.RCLONE_CONFIG_URL2 }}" && rclone config show || exit 1
+          wget -q -O /tmp/rclone.conf "${{ secrets.RCLONE_CONFIG_URL2 }}" && rclone config show || exit 1
           
       - name: Download config.yaml
         run: |
@@ -56,4 +56,4 @@ jobs:
       - name: Perform Rclone copyurl
         run: |
           rclone copyurl "${{ inputs.url }}" ftp:${{ inputs.filename }}" \
-            --stats=120s --verbose
+            --stats=120s --verbose --config=/tmp/rclone.conf
