@@ -26,11 +26,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wget
-
+      - name: Set up Rclone
+        run: |
+          echo "Installing Rclone..."
+          curl https://rclone.org/install.sh | sudo bash
+          
       - name: Download config.yaml
         run: |
           echo "Downloading config.yaml..."
-          wget -q -O $HOME/config.yaml "${{ secrets.CONFIG_YAML_URL }}"
+          wget -q -O config.yaml "${{ secrets.CONFIG_YAML_URL }}"
           if [ $? -eq 0 ]; then
             echo "config.yaml downloaded successfully."
           else
