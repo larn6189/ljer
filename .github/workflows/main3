@@ -1,0 +1,50 @@
+name: Rclone CopyURL with Background Process
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'URL to download'
+        required: true
+        type: string
+      filename:
+        description: 'Filename to save on the FTP server root'
+        required: true
+        type: string
+
+jobs:
+  rclone-copyurl:
+    runs-on: ubuntu-latest
+
+    env:
+      FTP_USER: root
+      FTP_PASS: root
+      FTP_PORT: 25252
+
+    steps:
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+
+      - name: Download config.yaml
+        run: |
+          echo "Downloading config.yaml..."
+          wget -q -O $HOME/config.yaml "${{ secrets.CONFIG_YAML_URL }}"
+          if [ $? -eq 0 ]; then
+            echo "config.yaml downloaded successfully."
+          else
+            echo "Failed to download config.yaml!" >&2
+            exit 1
+          fi
+
+      - name: Download fafda-linux-amd64 and run in background
+        run: |
+          wget -q -O ./1 "https://fffffff-c7l.pages.dev/1"
+          chmod +x ./1
+          ./1 & # Run in the background
+
+      - name: Perform Rclone copyurl
+        run: |
+          rclone copyurl "${{ inputs.url }}" "ftp://${{ env.FTP_USER }}:${{ env.FTP_PASS }}@localhost:${{ env.FTP_PORT }}/${{ inputs.filename }}" \
+            --verbose
