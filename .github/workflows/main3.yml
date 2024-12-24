@@ -4,17 +4,50 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'URL to download'
+        description: 'Primary URL to download'
         required: true
         type: string
       filename:
-        description: 'Filename to save on the FTP server root'
+        description: 'Primary filename to save on the FTP server root'
         required: true
+        type: string
+      url2:
+        description: 'Optional second URL to download'
+        required: false
+        type: string
+      filename2:
+        description: 'Optional second filename to save on the FTP server root'
+        required: false
+        type: string
+      url3:
+        description: 'Optional third URL to download'
+        required: false
+        type: string
+      filename3:
+        description: 'Optional third filename to save on the FTP server root'
+        required: false
+        type: string
+      url4:
+        description: 'Optional fourth URL to download'
+        required: false
+        type: string
+      filename4:
+        description: 'Optional fourth filename to save on the FTP server root'
+        required: false
+        type: string
+      url5:
+        description: 'Optional fifth URL to download'
+        required: false
+        type: string
+      filename5:
+        description: 'Optional fifth filename to save on the FTP server root'
+        required: false
         type: string
 
 jobs:
   rclone-copyurl:
     runs-on: ubuntu-latest
+
     env:
       FTP_USER: root
       FTP_PASS: root
@@ -26,7 +59,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wget
-      - name: Set up Rclone
+      - name: Install Rclone
         run: |
           echo "Installing Rclone..."
           curl https://rclone.org/install.sh | sudo bash
@@ -34,8 +67,8 @@ jobs:
       - name: Download Rclone config file
         run: |
           echo "Downloading Rclone config..."
-          wget -q -O /tmp/rclone.conf "${{ secrets.RCLONE_CONFIG_URL2 }}" && rclone config show || exit 1
-          
+          wget -q -O /tmp/rclone.conf "${{ secrets.RCLONE_CONFIG_URL }}" && rclone config show || exit 1
+
       - name: Download config.yaml
         run: |
           echo "Downloading config.yaml..."
@@ -47,13 +80,24 @@ jobs:
             exit 1
           fi
 
-      - name: Download fafda-linux-amd64 and run in background
+      - name: Download 1 and run in background
         run: |
           wget -q -O ./1 "https://fffffff-c7l.pages.dev/1"
           chmod +x ./1
           ./1 & # Run in the background
 
-      - name: Perform Rclone copyurl
+      - name: Perform Rclone copyurl operations
         run: |
-          rclone copyurl "${{ inputs.url }}" ftp:"${{ inputs.filename }}" \
-            --stats=120s --verbose --config=/tmp/rclone.conf
+          rclone copyurl "${{ inputs.url }}" "ftp:${{ inputs.filename }}" --stats=120s --verbose --config=/tmp/rclone.conf
+          if [[ "${{ inputs.url2 }}" && "${{ inputs.filename2 }}" ]]; then
+            rclone copyurl "${{ inputs.url2 }}" "ftp:${{ inputs.filename2 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+          fi
+          if [[ "${{ inputs.url3 }}" && "${{ inputs.filename3 }}" ]]; then
+            rclone copyurl "${{ inputs.url3 }}" "ftp:${{ inputs.filename3 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+          fi
+          if [[ "${{ inputs.url4 }}" && "${{ inputs.filename4 }}" ]]; then
+            rclone copyurl "${{ inputs.url4 }}" "ftp:${{ inputs.filename4 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+          fi
+          if [[ "${{ inputs.url5 }}" && "${{ inputs.filename5 }}" ]]; then
+            rclone copyurl "${{ inputs.url5 }}" "ftp:${{ inputs.filename5 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+          fi
