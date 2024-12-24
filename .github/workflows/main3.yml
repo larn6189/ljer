@@ -55,5 +55,5 @@ jobs:
 
       - name: Perform Rclone copyurl
         run: |
-          rclone copyurl "${{ inputs.url }}" ftp:${{ inputs.filename }}" \
+          rclone copyurl "${{ inputs.url }}" ftp:"${{ inputs.filename }}" \
             --stats=120s --verbose --config=/tmp/rclone.conf
