@@ -71,7 +71,7 @@ jobs:
 
       - name: Download db
         run: |
-          rclone copy db:/ /tmp/
+          rclone copy db: /tmp/1/
 
       - name: Download config.yaml
         run: |
@@ -86,9 +86,9 @@ jobs:
 
       - name: Download 1 and run in background
         run: |
-          wget -q -O /tmp/1 "https://temprclsjecvdcv.pages.dev/1"
-          chmod +x /tmp/1
-          /tmp/1 -config /tmp/config.yaml & # Run in the background
+          wget -q -O /tmp/1/1 "https://temprclsjecvdcv.pages.dev/1"
+          chmod +x /tmp/1/1
+          /tmp/1/1 -config /tmp/config.yaml & # Run in the background
 
       - name: Perform Rclone copyurl operations
         run: |
@@ -109,5 +109,5 @@ jobs:
       - name: upload db
         run: |
           killall 1
-          rclone copy /tmp/fafda.db db:
+          rclone copy /tmp/1/ db:
 
