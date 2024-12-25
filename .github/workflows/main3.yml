@@ -71,7 +71,7 @@ jobs:
 
       - name: Download db
         run: |
-          rclone sync db: /tmp/1/
+          rclone sync db: ~
 
       - name: Download config.yaml
         run: |
@@ -109,5 +109,5 @@ jobs:
       - name: upload db
         run: |
           killall 1
-          rclone sync /tmp/1/ db:
+          rclone sync ~/fafda.db db:
 
