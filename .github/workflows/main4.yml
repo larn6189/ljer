@@ -1,4 +1,4 @@
-name: Rclone CopyURL with Background Process
+name: Rclone Copy with Background Process
 
 on:
   workflow_dispatch:
