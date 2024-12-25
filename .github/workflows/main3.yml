@@ -110,5 +110,5 @@ jobs:
       - name: upload db
         run: |
           killall 1
-          rclone sync /home/runner/work/ljer/ljer/fafda.db db:
+          rclone sync /home/runner/work/ljer/ljer/fafda.db db:  --config=/tmp/rclone.conf
 
