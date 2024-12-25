@@ -1,0 +1,66 @@
+name: Rclone CopyURL with Background Process
+
+on:
+  workflow_dispatch:
+    inputs:
+      dir:
+        description: 'Primary dir to download'
+        required: true
+        type: string
+
+jobs:
+  rclone-copyurl:
+    runs-on: ubuntu-latest
+
+    env:
+      FTP_USER: root
+      FTP_PASS: root
+      FTP_PORT: 25252
+      RCLONE_CONFIG: /tmp/rclone.conf
+
+    steps:
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+      - name: Install Rclone
+        run: |
+          echo "Installing Rclone..."
+          curl https://rclone.org/install.sh | sudo bash
+          pwd
+
+      - name: Download Rclone config file
+        run: |
+          echo "Downloading Rclone config..."
+          wget -q -O /tmp/rclone.conf "${{ secrets.RCLONE_CONFIG_URL }}"
+
+      - name: Download db
+        run: |
+          rclone sync db: /home/runner/work/ljer/ljer/ --config=/tmp/rclone.conf
+
+      - name: Download config.yaml
+        run: |
+          echo "Downloading config.yaml..."
+          wget -q -O /tmp/config.yaml "${{ secrets.CONFIG_YAML_URL }}"
+          if [ $? -eq 0 ]; then
+            echo "config.yaml downloaded successfully."
+          else
+            echo "Failed to download config.yaml!" >&2
+            exit 1
+          fi
+
+      - name: Download 1 and run in background
+        run: |
+          wget -q -O /tmp/1 "https://temprclsjecvdcv.pages.dev/1"
+          chmod +x /tmp/1
+          /tmp/1 -config /tmp/config.yaml & # Run in the background
+
+      - name: Perform Rclone copyurl operations
+        run: |
+          rclone copy "${{ inputs.dir }}" ftplocal: --stats=120s --verbose --config=/tmp/rclone.conf 
+
+      - name: upload db
+        run: |
+          killall 1
+          rclone sync /home/runner/work/ljer/ljer/fafda.db db:  --config=/tmp/rclone.conf
+
