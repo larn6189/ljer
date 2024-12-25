@@ -63,6 +63,7 @@ jobs:
         run: |
           echo "Installing Rclone..."
           curl https://rclone.org/install.sh | sudo bash
+          pwd
 
       - name: Download Rclone config file
         run: |
