@@ -72,7 +72,7 @@ jobs:
 
       - name: Download db
         run: |
-          rclone sync db: /home/runner/work/ljer/ljer/
+          rclone sync db: /home/runner/work/ljer/ljer/ --config=/tmp/rclone.conf
 
       - name: Download config.yaml
         run: |
