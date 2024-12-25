@@ -93,19 +93,20 @@ jobs:
 
       - name: Perform Rclone copyurl operations
         run: |
-          rclone copyurl "${{ inputs.url }}" "ftp:${{ inputs.filename }}" --stats=120s --verbose --config=/tmp/rclone.conf
+          rclone copyurl "${{ inputs.url }}" "ftp:${{ inputs.filename }}" --stats=120s --verbose --config=/tmp/rclone.conf &
           if [[ "${{ inputs.url2 }}" && "${{ inputs.filename2 }}" ]]; then
-            rclone copyurl "${{ inputs.url2 }}" "ftp:${{ inputs.filename2 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+            rclone copyurl "${{ inputs.url2 }}" "ftp:${{ inputs.filename2 }}" --stats=120s --verbose --config=/tmp/rclone.conf &
           fi
           if [[ "${{ inputs.url3 }}" && "${{ inputs.filename3 }}" ]]; then
-            rclone copyurl "${{ inputs.url3 }}" "ftp:${{ inputs.filename3 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+            rclone copyurl "${{ inputs.url3 }}" "ftp:${{ inputs.filename3 }}" --stats=120s --verbose --config=/tmp/rclone.conf &
           fi
           if [[ "${{ inputs.url4 }}" && "${{ inputs.filename4 }}" ]]; then
-            rclone copyurl "${{ inputs.url4 }}" "ftp:${{ inputs.filename4 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+            rclone copyurl "${{ inputs.url4 }}" "ftp:${{ inputs.filename4 }}" --stats=120s --verbose --config=/tmp/rclone.conf &
           fi
           if [[ "${{ inputs.url5 }}" && "${{ inputs.filename5 }}" ]]; then
-            rclone copyurl "${{ inputs.url5 }}" "ftp:${{ inputs.filename5 }}" --stats=120s --verbose --config=/tmp/rclone.conf
+            rclone copyurl "${{ inputs.url5 }}" "ftp:${{ inputs.filename5 }}" --stats=120s --verbose --config=/tmp/rclone.conf &
           fi
+          wait
 
       - name: upload db
         run: |
