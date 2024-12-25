@@ -71,7 +71,7 @@ jobs:
 
       - name: Download db
         run: |
-          rclone copy db:1.db /tmp/1.db
+          rclone copy db: /tmp/
 
       - name: Download config.yaml
         run: |
@@ -108,5 +108,5 @@ jobs:
 
       - name: upload db
         run: |
-          rclone copy /tmp/1.db db:1.db
+          rclone copy /tmp/1.db db:
 
