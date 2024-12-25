@@ -67,7 +67,8 @@ jobs:
       - name: Download Rclone config file
         run: |
           echo "Downloading Rclone config..."
-          wget -q -O /tmp/rclone.conf "${{ secrets.RCLONE_CONFIG_URL2 }}" && rclone config show || exit 1
+          wget -q -O /tmp/rclone.conf "${{ secrets.RCLONE_CONFIG_URL2 }}"
+          pwd
 
       - name: Download db
         run: |
