@@ -72,7 +72,7 @@ jobs:
 
       - name: Download db
         run: |
-          rclone sync db: ~
+          rclone sync db: /home/runner/work/ljer/ljer/
 
       - name: Download config.yaml
         run: |
@@ -110,5 +110,5 @@ jobs:
       - name: upload db
         run: |
           killall 1
-          rclone sync ~/fafda.db db:
+          rclone sync /home/runner/work/ljer/ljer/fafda.db db:
 
