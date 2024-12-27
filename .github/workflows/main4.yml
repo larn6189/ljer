@@ -57,7 +57,7 @@ jobs:
 
       - name: Perform Rclone copyurl operations
         run: |
-          rclone copy movies: ftplocal: --stats=120s --verbose --transfers=1 --config=/tmp/rclone.conf --filter "+ ${{ inputs.dir }}"
+          rclone copy movies: ftplocal: --stats=120s --verbose --transfers=1 --config=/tmp/rclone.conf --filter "+ ${{ inputs.dir }}/**"
 
       - name: upload db
         run: |
