@@ -57,7 +57,7 @@ jobs:
 
       - name: Perform Rclone copyurl operations
         run: |
-          timeout 5h rclone copy movies: ftplocal: --stats=120s --verbose --transfers=3 --config=/tmp/rclone.conf --filter "+ ${{ inputs.dir }}/**" --filter "- *" || echo "Rclone was killed after exceeding 5 hours, marking as success."
+          timeout 5h rclone copy movies: ftplocal: --stats=120s --verbose --transfers=2 --config=/tmp/rclone.conf --filter "+ ${{ inputs.dir }}/**" --filter "- *" || echo "Rclone was killed after exceeding 5 hours, marking as success."
 
       - name: upload db
         run: |
